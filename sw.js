@@ -1,5 +1,5 @@
 /* Service Worker：缓存优先，离线秒开 */
-const CACHE = 'low-power-v2';
+const CACHE = 'low-power-v3';
 const ASSETS = ['./', './index.html', './manifest.json', './icon.svg'];
 
 self.addEventListener('install', e => {
