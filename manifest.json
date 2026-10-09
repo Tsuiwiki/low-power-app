@@ -1,0 +1,19 @@
+{
+  "name": "低电量 · 精力防守",
+  "short_name": "精力防守",
+  "description": "低阻力精力管理与自我防守工具",
+  "start_url": "./index.html",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "portrait",
+  "background_color": "#121316",
+  "theme_color": "#121316",
+  "icons": [
+    {
+      "src": "./icon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any"
+    }
+  ]
+}

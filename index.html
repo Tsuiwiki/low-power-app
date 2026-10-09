@@ -1,0 +1,550 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="low-power">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover">
+<!-- PWA 移动端优化标签 -->
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="精力防守">
+<meta name="theme-color" content="#121316">
+<link rel="manifest" href="./manifest.json">
+<link rel="icon" type="image/svg+xml" href="./icon.svg">
+<link rel="apple-touch-icon" href="data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 512 512%22%3E%3Crect width=%22512%22 height=%22512%22 rx=%22110%22 fill=%22%23121316%22/%3E%3Crect x=%22136%22 y=%22196%22 width=%22200%22 height=%22120%22 rx=%2226%22 fill=%22none%22 stroke=%22%2381C784%22 stroke-width=%2220%22/%3E%3Crect x=%22348%22 y=%22234%22 width=%2234%22 height=%2244%22 rx=%228%22 fill=%22%2381C784%22/%3E%3Crect x=%22158%22 y=%22218%22 width=%2266%22 height=%2276%22 rx=%2212%22 fill=%22%2381C784%22/%3E%3C/svg%3E">
+<title>低电量 · 精力防守</title>
+<style>
+  /* ========== 主题变量：离散双档 ========== */
+  :root[data-theme="low-power"] {
+    --bg: #121316;
+    --bg-card: #1c1e22;
+    --text: #c9cdd3;
+    --text-dim: #6b7078;
+    --accent: #81C784;
+    --accent-dim: rgba(129,199,132,.15);
+    --ring-track: #2a2d33;
+    --bg-ghost: #1A1C22;
+  }
+  :root[data-theme="standard"] {
+    --bg: #f4f5f3;
+    --bg-card: #ffffff;
+    --text: #2c313a;
+    --text-dim: #8a9099;
+    --accent: #4a8f5d;
+    --accent-dim: rgba(74,143,93,.12);
+    --ring-track: #e3e6e1;
+    --bg-ghost: #E9ECE7;
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+  html, body { height: 100%; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+    transition: background-color .4s ease, color .4s ease; /* F-102: 离散切换 + 0.4s 渐隐 */
+    max-width: 480px;
+    margin: 0 auto;
+    padding: 20px 20px 120px;
+    min-height: 100vh;
+    min-height: 100dvh; /* iOS Safari 动态视口高度，避免地址栏遮挡产生滚动条 */
+  }
+
+  /* ========== F-101 电量滑动条 ========== */
+  .energy-panel { padding: 8px 0 4px; }
+  .energy-label { font-size: 13px; color: var(--text-dim); display: flex; justify-content: space-between; align-items: baseline; }
+  .energy-value { font-size: 28px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+  input[type=range] {
+    width: 100%; margin: 14px 0 6px; appearance: none; -webkit-appearance: none;
+    height: 6px; border-radius: 3px; background: var(--ring-track); outline: none;
+  }
+  input[type=range]::-webkit-slider-thumb {
+    appearance: none; -webkit-appearance: none; width: 26px; height: 26px; border-radius: 50%;
+    background: var(--accent); border: 3px solid var(--bg); box-shadow: 0 1px 4px rgba(0,0,0,.3); cursor: pointer;
+  }
+  .energy-presets { display: flex; gap: 10px; margin-top: 8px; }
+  .energy-presets button {
+    flex: 1; padding: 6px 0; min-height: 44px; font-size: 12px; border-radius: 14px; border: 1px solid var(--ring-track);
+    background: transparent; color: var(--text-dim); cursor: pointer;
+    transition: border-color .3s ease, background-color .3s ease, color .3s ease;
+  }
+  .energy-presets button:active { background: var(--accent-dim); color: var(--accent); }
+  /* 当前档位选中态：微弱绿底 + 绿边高亮 */
+  .energy-presets button.active {
+    border-color: var(--accent); background: var(--accent-dim); color: var(--accent);
+  }
+
+  /* ========== F-201 安抚卡片 ========== */
+  .comfort-card {
+    margin-top: 22px; padding: 18px; border-radius: 14px;
+    background: var(--accent-dim); border-left: 3px solid var(--accent);
+    font-size: 14px; line-height: 1.8; color: var(--text);
+    display: none;
+  }
+  :root[data-theme="low-power"] ~ body .comfort-card, body[data-theme="low-power"] .comfort-card { display: block; }
+
+  .card {
+    margin-top: 18px; padding: 20px; border-radius: 14px;
+    background: var(--bg-card);
+    transition: background-color .4s ease;
+  }
+  .card-title { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 12px; }
+
+  /* ========== F-202 微动作卡片 ========== */
+  .micro-action-text { font-size: 19px; line-height: 1.6; min-height: 60px; display: flex; align-items: center; }
+  .micro-actions-row { display: flex; gap: 10px; margin-top: 16px; }
+  .btn {
+    border: none; border-radius: 12px; cursor: pointer; font-size: 14px;
+    padding: 12px 16px; min-height: 48px; transition: opacity .2s;
+  }
+  .btn:active { opacity: .7; }
+  .btn-ghost { background: transparent; border: 1px solid var(--ring-track); color: var(--text-dim); }
+  .btn-primary { background: var(--accent); color: #101211; font-weight: 600; flex: 1; }
+  :root[data-theme="standard"] .btn-primary { color: #fff; }
+
+  .btn-rest {
+    width: 100%; margin-top: 12px; min-height: 48px;
+    background: var(--bg-ghost); border: none; color: var(--text-dim);
+    transition: background-color .4s ease, opacity .2s;
+  }
+
+  /* ========== 断点 & 资产 ========== */
+  .checkpoint-note { font-size: 15px; line-height: 1.6; word-break: break-all; }
+  .checkpoint-time { font-size: 11px; color: var(--text-dim); margin-top: 6px; }
+  .checkpoint-input {
+    width: 100%; background: transparent; border: none; border-bottom: 1px solid var(--ring-track);
+    color: var(--text); font-size: 15px; padding: 8px 0; outline: none; display: none;
+  }
+  .stats-row { display: flex; gap: 8px; margin-top: 18px; }
+  .stat { flex: 1; text-align: center; padding: 12px 4px; border-radius: 12px; background: var(--bg-card); transition: background-color .4s ease; }
+  .stat-num { font-size: 22px; font-weight: 600; color: var(--accent); font-variant-numeric: tabular-nums; }
+  .stat-label { font-size: 11px; color: var(--text-dim); margin-top: 4px; }
+
+  /* ========== 全屏计时器 (F-203 / F-204) ========== */
+  .timer-overlay {
+    position: fixed; inset: 0; z-index: 50; display: none;
+    background: var(--bg); flex-direction: column; align-items: center; justify-content: center;
+  }
+  .timer-overlay.rest-mode { background: #000; color: #4a4f55; }
+  .timer-overlay.active { display: flex; }
+  .ring-wrap { position: relative; width: 220px; height: 220px; }
+  .ring-wrap svg { transform: rotate(-90deg); }
+  .ring-track { stroke: var(--ring-track); }
+  .rest-mode .ring-track { stroke: #1c1c1c; }
+  .ring-progress { stroke: var(--accent); transition: stroke-dashoffset .5s linear; }
+  .timer-text {
+    position: absolute; inset: 0; display: flex; align-items: center; justify-content: center;
+    font-size: 44px; font-weight: 300; font-variant-numeric: tabular-nums;
+  }
+  .timer-action-name { margin-top: 28px; font-size: 15px; color: var(--text-dim); max-width: 70%; text-align: center; line-height: 1.6; }
+  .wakelock-hint { position: absolute; bottom: 90px; font-size: 11px; color: var(--text-dim); opacity: .6; display: none; }
+  .timer-cancel {
+    position: absolute; bottom: 36px; background: transparent; border: none;
+    color: var(--text-dim); font-size: 13px; cursor: pointer; padding: 10px 20px;
+  }
+
+  /* ========== 完成弹窗 ========== */
+  .modal-mask {
+    position: fixed; inset: 0; z-index: 60; background: rgba(0,0,0,.55);
+    display: none; align-items: center; justify-content: center; padding: 30px;
+    backdrop-filter: blur(4px); -webkit-backdrop-filter: blur(4px); /* 毛玻璃层级感 */
+  }
+  .modal-mask.active { display: flex; }
+  .modal { background: var(--bg-card); border-radius: 18px; padding: 28px 24px; max-width: 340px; width: 100%; text-align: center; }
+  /* 微资产 +1 视觉正反馈 */
+  .modal-icon { font-size: 30px; font-weight: 600; color: var(--accent); margin-bottom: 14px; animation: sprout .6s cubic-bezier(.34,1.56,.64,1) both; }
+  @keyframes sprout {
+    0% { transform: scale(.3) translateY(12px); opacity: 0; }
+    100% { transform: scale(1) translateY(0); opacity: 1; }
+  }
+  /* 主页数字递增脉冲动画 */
+  .stat-num.bump { animation: bump .6s ease; }
+  @keyframes bump {
+    0% { transform: scale(1); }
+    40% { transform: scale(1.35); }
+    100% { transform: scale(1); }
+  }
+  .modal-text { font-size: 15px; line-height: 1.9; }
+  .modal-btns { display: flex; flex-direction: column; gap: 10px; margin-top: 22px; }
+
+  /* ========== 弱提示 ========== */
+  .toast {
+    position: fixed; left: 50%; bottom: 80px; transform: translateX(-50%) translateY(10px);
+    font-size: 12px; color: var(--text-dim); opacity: 0; transition: all .5s ease; pointer-events: none; z-index: 70;
+  }
+  .toast.show { opacity: .85; transform: translateX(-50%) translateY(0); }
+  .memory-mode-hint { position: fixed; bottom: 8px; left: 0; right: 0; text-align: center; font-size: 10px; color: var(--text-dim); opacity: .5; display: none; }
+</style>
+</head>
+<body>
+
+  <!-- F-101 电量评估 -->
+  <div class="energy-panel">
+    <div class="energy-label">
+      <span>今日电量</span>
+      <span class="energy-value" id="energyValue">20%</span>
+    </div>
+    <input type="range" id="energySlider" min="1" max="100" value="20">
+    <div class="energy-presets">
+      <button data-v="20">20% 低电量</button>
+      <button data-v="50">50% 常规</button>
+      <button data-v="80">80% 充沛</button>
+    </div>
+  </div>
+
+  <!-- F-201 安抚卡片（仅低电量模式） -->
+  <div class="comfort-card" id="comfortCard">
+    现在的低能量是身体的保护机制。<br>今天不需要做大事，完成 1 个微动作即算成功。
+  </div>
+
+  <!-- F-202 / F-203 微动作 + 微启动 -->
+  <div class="card">
+    <div class="card-title">今日微动作</div>
+    <div class="micro-action-text" id="microActionText"></div>
+    <div class="micro-actions-row">
+      <button class="btn btn-ghost" id="btnReroll">🎲 换一个</button>
+      <button class="btn btn-primary" id="btnStart">▶ 1分钟微启动</button>
+    </div>
+    <button class="btn btn-rest" id="btnRest">🛋️ 允许自己纯休息 20 分钟</button>
+  </div>
+
+  <!-- F-301 断点存盘 -->
+  <div class="card" id="checkpointCard">
+    <div class="card-title">上次的断点</div>
+    <div class="checkpoint-note" id="checkpointDisplay">点击这里，留下 1 句话断点…</div>
+    <div class="checkpoint-time" id="checkpointTime"></div>
+    <input class="checkpoint-input" id="checkpointInput" maxlength="50" placeholder="例：Redis Sentinel 配置文件改至第 32 行">
+  </div>
+
+  <!-- F-302 资产累计（只加不减，无 Streak） -->
+  <div class="stats-row">
+    <div class="stat"><div class="stat-num" id="statCompleted">0</div><div class="stat-label">累计完成 (次)</div></div>
+    <div class="stat"><div class="stat-num" id="statAttempts">0</div><div class="stat-label">尝试启动 (次)</div></div>
+    <div class="stat"><div class="stat-num" id="statRest">0</div><div class="stat-label">休息 (分钟)</div></div>
+  </div>
+
+  <!-- 全屏计时器 -->
+  <div class="timer-overlay" id="timerOverlay">
+    <div class="ring-wrap">
+      <svg width="220" height="220">
+        <circle class="ring-track" cx="110" cy="110" r="100" fill="none" stroke-width="6"/>
+        <circle class="ring-progress" id="ringProgress" cx="110" cy="110" r="100" fill="none" stroke-width="6"
+                stroke-linecap="round" stroke-dasharray="628.3" stroke-dashoffset="0"/>
+      </svg>
+      <div class="timer-text" id="timerText">1:00</div>
+    </div>
+    <div class="timer-action-name" id="timerActionName"></div>
+    <div class="wakelock-hint" id="wakelockHint">已开启防熄屏模式（如屏幕熄灭可轻触唤醒）</div>
+    <button class="timer-cancel" id="btnCancelTimer">✕ 先到这，随时再来</button>
+  </div>
+
+  <!-- 完成弹窗 -->
+  <div class="modal-mask" id="completeModal">
+    <div class="modal">
+      <div class="modal-icon">🌱 +1</div>
+      <div class="modal-text">启动成功！<br>你可以毫无罪恶感地关闭应用去休息，<br>或者选择继续做一会儿。</div>
+      <div class="modal-btns">
+        <button class="btn btn-primary" id="btnCloseRest">关闭去休息</button>
+        <button class="btn btn-ghost" id="btnContinue3">继续 3 分钟</button>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast" id="toast"></div>
+  <div class="memory-mode-hint" id="memoryHint">当前为无痕体验模式，数据仅在此次运行期间有效</div>
+
+<script>
+'use strict';
+
+/* ================= 数据层：Local-First + 静默降级 (5.2) ================= */
+const LS_KEY = 'low_power_app_state';
+const DEFAULT_STATE = {
+  user_settings: { current_energy_level: 20, theme_mode: 'low-power' },
+  current_checkpoint: { note: '', updated_at: null },
+  asset_stats: { total_completed_actions: 0, attempt_count: 0, total_rest_minutes: 0 },
+  custom_micro_actions: []
+};
+const DEFAULT_POOL = [
+  '把双脚平放在地板上',
+  '喝一口温水',
+  '打开文档，只写 1 个标题',
+  '看书本的第 1 行字',
+  '把椅子往后推，站起来 10 秒',
+  '闭眼，做 3 次缓慢的深呼吸',
+  '把手机屏幕朝下扣在桌上',
+  '说出此刻你看到的 3 样东西'
+];
+
+let memoryOnly = false; // 无痕/存储不可用时的内存态
+// 兼容旧浏览器/WebView：structuredClone 在 iOS Safari < 15.4 不存在，用 JSON 深拷贝兜底
+function cloneDefault() { return JSON.parse(JSON.stringify(DEFAULT_STATE)); }
+let state = loadState();
+
+function loadState() {
+  try {
+    const raw = localStorage.getItem(LS_KEY);
+    if (!raw) return cloneDefault();
+    // Safe-Parsing：字段合并，缺失字段用默认值补齐，禁止清空旧数据
+    const parsed = JSON.parse(raw);
+    return {
+      ...cloneDefault(), ...parsed,
+      user_settings: { ...DEFAULT_STATE.user_settings, ...(parsed.user_settings || {}) },
+      current_checkpoint: { ...DEFAULT_STATE.current_checkpoint, ...(parsed.current_checkpoint || {}) },
+      asset_stats: { ...DEFAULT_STATE.asset_stats, ...(parsed.asset_stats || {}) }
+    };
+  } catch (e) {
+    memoryOnly = true;
+    return cloneDefault();
+  }
+}
+function saveState() {
+  if (memoryOnly) return;
+  try { localStorage.setItem(LS_KEY, JSON.stringify(state)); }
+  catch (e) { memoryOnly = true; document.getElementById('memoryHint').style.display = 'block'; }
+}
+// 启动时探测一次写入权限
+try { localStorage.setItem(LS_KEY + '_probe', '1'); localStorage.removeItem(LS_KEY + '_probe'); }
+catch (e) { memoryOnly = true; document.getElementById('memoryHint').style.display = 'block'; }
+
+/* ================= F-101 / F-102 电量路由与主题 ================= */
+const slider = document.getElementById('energySlider');
+const energyValue = document.getElementById('energyValue');
+
+function applyEnergy(level) {
+  level = Math.max(1, Math.min(100, Math.round(level)));
+  state.user_settings.current_energy_level = level;
+  // 连续无断层边界：<=39% 低电量防守，>=40% 常规
+  const theme = level <= 39 ? 'low-power' : 'standard';
+  state.user_settings.theme_mode = theme;
+  document.documentElement.setAttribute('data-theme', theme);
+  document.body.setAttribute('data-theme', theme);
+  slider.value = level;
+  energyValue.textContent = level + '%';
+  // 预设按钮选中态：按档位区间归属（≤39%→20档 / 40-64%→50档 / ≥65%→80档）
+  const activePreset = level <= 39 ? 20 : (level <= 64 ? 50 : 80);
+  document.querySelectorAll('.energy-presets button').forEach(b =>
+    b.classList.toggle('active', +b.dataset.v === activePreset));
+  saveState();
+}
+slider.addEventListener('input', e => applyEnergy(+e.target.value));
+slider.addEventListener('change', e => applyEnergy(+e.target.value)); // 旧 WebView 兜底：松手时也强制应用一次
+document.querySelectorAll('.energy-presets button').forEach(b =>
+  b.addEventListener('click', () => applyEnergy(+b.dataset.v)));
+
+/* ================= F-202 微动作抽卡（排除当前项） ================= */
+let currentAction = null;
+function pool() { return DEFAULT_POOL.concat(state.custom_micro_actions || []); }
+function drawAction() {
+  let candidates = pool().filter(a => a !== currentAction); // Random(Pool - CurrentItem)
+  if (candidates.length === 0) candidates = pool(); // 保底：池子只有 1 项被滤空时回退原池
+  currentAction = candidates[Math.floor(Math.random() * candidates.length)];
+  document.getElementById('microActionText').textContent = currentAction || '喝一口温水';
+}
+document.getElementById('btnReroll').addEventListener('click', drawAction);
+
+/* ================= F-203 / F-204 计时器（绝对时间戳 + Wake Lock 降级） ================= */
+const overlay = document.getElementById('timerOverlay');
+const ring = document.getElementById('ringProgress');
+const timerText = document.getElementById('timerText');
+const CIRC = 628.3;
+let timer = null; // { endTs, totalSec, kind: 'launch'|'rest', rafId, wakeLock }
+
+async function requestWakeLock() {
+  try {
+    if ('wakeLock' in navigator) {
+      timer.wakeLock = await navigator.wakeLock.request('screen');
+      document.getElementById('wakelockHint').style.display = 'none';
+      return;
+    }
+    throw new Error('unsupported');
+  } catch (e) {
+    // iOS Safari 等不支持时降级为微弱提示，不弹错误
+    if (timer && timer.kind === 'launch')
+      document.getElementById('wakelockHint').style.display = 'block';
+  }
+}
+
+function startTimer(seconds, kind, actionName) {
+  timer = { endTs: Date.now() + seconds * 1000, totalSec: seconds, kind, rafId: null, wakeLock: null };
+  overlay.classList.add('active');
+  overlay.classList.toggle('rest-mode', kind === 'rest');
+  document.getElementById('timerActionName').textContent = kind === 'rest' ? '什么都不用做，好好休息。' : actionName;
+  document.getElementById('wakelockHint').style.display = 'none';
+  if (kind === 'launch') requestWakeLock();
+  if (kind === 'rest') startRestAudio();
+  tick();
+}
+
+function tick() {
+  if (!timer) return;
+  // 基于系统绝对时间戳：切后台/锁屏后切回，直接按差值结算
+  const remainMs = timer.endTs - Date.now();
+  if (remainMs <= 0) { completeTimer(); return; }
+  const remainSec = Math.ceil(remainMs / 1000);
+  const m = Math.floor(remainSec / 60), s = remainSec % 60;
+  timerText.textContent = m + ':' + String(s).padStart(2, '0');
+  ring.style.strokeDashoffset = (CIRC * (1 - remainMs / (timer.totalSec * 1000))).toFixed(1);
+  timer.rafId = setTimeout(tick, 250);
+}
+
+function releaseTimer() {
+  if (!timer) return;
+  clearTimeout(timer.rafId);
+  if (timer.wakeLock) { try { timer.wakeLock.release(); } catch (e) {} }
+  stopRestAudio();
+}
+
+function completeTimer() {
+  const kind = timer.kind;
+  releaseTimer();
+  overlay.classList.remove('active');
+  if (kind === 'launch') {
+    state.asset_stats.total_completed_actions += 1;
+    saveState(); renderStats();
+    try { if (navigator.vibrate) navigator.vibrate([40, 60, 40]); } catch (e) {} // 轻柔触觉反馈
+    document.getElementById('completeModal').classList.add('active');
+  } else {
+    state.asset_stats.total_rest_minutes += 20;
+    saveState(); renderStats();
+    showToast('高质量恢复完成，欢迎回来。');
+  }
+  timer = null;
+}
+
+// 中途取消：无二次确认、无失败提示，静默记录 attempt_count
+document.getElementById('btnCancelTimer').addEventListener('click', () => {
+  if (!timer) return;
+  const kind = timer.kind;
+  if (kind === 'rest') {
+    // 休息提前结束：按实际休息分钟计入资产，不算失败
+    const rested = Math.floor((timer.totalSec * 1000 - (timer.endTs - Date.now())) / 60000);
+    if (rested > 0) state.asset_stats.total_rest_minutes += rested;
+  } else {
+    state.asset_stats.attempt_count += 1;
+  }
+  saveState(); renderStats();
+  releaseTimer();
+  overlay.classList.remove('active');
+  timer = null;
+  showToast('随时可以再来，先安心休息。');
+});
+
+// 切回前台时 tick 会基于时间戳自动结算（completeTimer 直接判定完成）
+document.addEventListener('visibilitychange', () => {
+  if (!document.hidden && timer) {
+    if (timer.kind === 'launch' && !timer.wakeLock) requestWakeLock();
+  }
+});
+
+document.getElementById('btnStart').addEventListener('click', () => startTimer(60, 'launch', currentAction));
+document.getElementById('btnRest').addEventListener('click', () => startTimer(20 * 60, 'rest', ''));
+document.getElementById('btnCloseRest').addEventListener('click', () => {
+  document.getElementById('completeModal').classList.remove('active');
+  // 返回主页时的微资产递增动画：数字脉冲一下，让 +1 被看见
+  const num = document.getElementById('statCompleted');
+  num.classList.remove('bump');
+  void num.offsetWidth; // 强制重排，确保动画可重复触发
+  num.classList.add('bump');
+});
+document.getElementById('btnContinue3').addEventListener('click', () => {
+  document.getElementById('completeModal').classList.remove('active');
+  startTimer(180, 'launch', currentAction); // UC-01 扩展 5a：继续 3 分钟
+});
+
+/* ================= 休息模式轻柔音效（WebAudio，呼吸拍频底音） ================= */
+let audioCtx = null, audioNodes = null;
+function startRestAudio() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    // 部分浏览器 AudioContext 创建后处于 suspended，必须显式 resume
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    const master = audioCtx.createGain();
+    master.gain.value = 0;
+    master.gain.linearRampToValueAtTime(0.09, audioCtx.currentTime + 3); // 3 秒淡入，避免突兀
+    master.connect(audioCtx.destination);
+    // 轻微失谐的双正弦（220Hz / 221.5Hz）→ 约 1.5Hz 柔和呼吸拍频
+    const oscA = audioCtx.createOscillator(); oscA.type = 'sine'; oscA.frequency.value = 220;
+    const oscB = audioCtx.createOscillator(); oscB.type = 'sine'; oscB.frequency.value = 221.5;
+    const gA = audioCtx.createGain(); gA.gain.value = 0.6;
+    const gB = audioCtx.createGain(); gB.gain.value = 0.4;
+    oscA.connect(gA).connect(master);
+    oscB.connect(gB).connect(master);
+    oscA.start(); oscB.start();
+    audioNodes = { master, oscs: [oscA, oscB] };
+  } catch (e) { /* 音效不可用时静默跳过，不影响休息 */ }
+}
+function stopRestAudio() {
+  if (!audioNodes) return;
+  const nodes = audioNodes;
+  try {
+    nodes.master.gain.cancelScheduledValues(audioCtx.currentTime);
+    nodes.master.gain.setValueAtTime(nodes.master.gain.value, audioCtx.currentTime);
+    nodes.master.gain.linearRampToValueAtTime(0, audioCtx.currentTime + 0.5); // 0.5s 淡出
+    setTimeout(() => nodes.oscs.forEach(o => { try { o.stop(); } catch (e) {} }), 600);
+  } catch (e) {}
+  audioNodes = null;
+}
+
+/* ================= F-301 断点存盘 ================= */
+const cpDisplay = document.getElementById('checkpointDisplay');
+const cpInput = document.getElementById('checkpointInput');
+const cpTime = document.getElementById('checkpointTime');
+
+function renderCheckpoint() {
+  const cp = state.current_checkpoint;
+  if (cp.note) {
+    cpDisplay.textContent = cp.note;
+    cpTime.textContent = cp.updated_at ? '存于 ' + new Date(cp.updated_at).toLocaleString('zh-CN') : '';
+  } else {
+    cpDisplay.textContent = '点击这里，留下 1 句话断点…';
+    cpTime.textContent = '';
+  }
+}
+document.getElementById('checkpointCard').addEventListener('click', e => {
+  if (e.target === cpInput) return;
+  cpDisplay.style.display = 'none'; cpTime.style.display = 'none';
+  cpInput.style.display = 'block';
+  cpInput.value = state.current_checkpoint.note || '';
+  cpInput.focus();
+});
+function commitCheckpoint() {
+  const v = cpInput.value.trim().slice(0, 50); // 截断校验：上限 50 字
+  // 误触保护：空输入不覆写旧断点，避免无损存盘被一次误点冲掉
+  if (v !== '') {
+    state.current_checkpoint = { note: v, updated_at: new Date().toISOString() };
+    saveState();
+    showToast('断点已保存');
+  }
+  cpInput.style.display = 'none';
+  cpDisplay.style.display = 'block'; cpTime.style.display = 'block';
+  renderCheckpoint();
+}
+cpInput.addEventListener('blur', commitCheckpoint);
+cpInput.addEventListener('keydown', e => { if (e.key === 'Enter') cpInput.blur(); });
+
+/* ================= 渲染与工具 ================= */
+function renderStats() {
+  document.getElementById('statCompleted').textContent = state.asset_stats.total_completed_actions;
+  document.getElementById('statAttempts').textContent = state.asset_stats.attempt_count;
+  document.getElementById('statRest').textContent = state.asset_stats.total_rest_minutes;
+}
+let toastTimer = null;
+function showToast(msg) {
+  const t = document.getElementById('toast');
+  t.textContent = msg; t.classList.add('show');
+  clearTimeout(toastTimer);
+  toastTimer = setTimeout(() => t.classList.remove('show'), 2500);
+}
+
+/* ================= 启动 ================= */
+// PWA：注册 Service Worker 实现离线可用（静默失败，不影响核心功能）
+if ('serviceWorker' in navigator) {
+  try { navigator.serviceWorker.register('./sw.js').catch(function () {}); } catch (e) {}
+}
+applyEnergy(state.user_settings.current_energy_level);
+drawAction();
+renderCheckpoint();
+renderStats();
+</script>
+</body>
+</html>
