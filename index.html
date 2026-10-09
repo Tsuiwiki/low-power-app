@@ -88,7 +88,26 @@
     background: var(--bg-card);
     transition: background-color .4s ease;
   }
-  .card-title { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 12px; }
+  .card-title { font-size: 12px; color: var(--text-dim); letter-spacing: 1px; margin-bottom: 12px; display: flex; justify-content: space-between; align-items: center; }
+  .icon-btn { background: none; border: none; color: var(--text-dim); font-size: 13px; cursor: pointer; opacity: .55; padding: 4px 8px; min-height: 0; }
+  .icon-btn:active { opacity: 1; }
+
+  /* 断点历史（弱展示，无断签暗示） */
+  .checkpoint-history { display: none; margin-top: 12px; border-top: 1px solid var(--ring-track); padding-top: 10px; }
+  .checkpoint-history.open { display: block; }
+  .history-item { font-size: 12px; color: var(--text-dim); line-height: 1.5; padding: 7px 0; border-bottom: 1px dashed var(--ring-track); word-break: break-all; }
+  .history-item:last-child { border-bottom: none; }
+  .history-item .h-time { opacity: .55; margin-right: 8px; font-variant-numeric: tabular-nums; }
+
+  /* 自定义微动作管理 */
+  .custom-panel { display: none; margin-top: 14px; border-top: 1px solid var(--ring-track); padding-top: 12px; }
+  .custom-panel.open { display: block; }
+  .custom-item { display: flex; justify-content: space-between; align-items: center; font-size: 13px; color: var(--text-dim); padding: 6px 0; }
+  .custom-item button { background: none; border: none; color: var(--text-dim); opacity: .5; cursor: pointer; font-size: 12px; padding: 2px 8px; }
+  .custom-empty { font-size: 12px; color: var(--text-dim); opacity: .6; padding: 4px 0; }
+  .custom-add-row { display: flex; gap: 8px; margin-top: 8px; }
+  .custom-add-row input { flex: 1; background: transparent; border: none; border-bottom: 1px solid var(--ring-track); color: var(--text); font-size: 13px; padding: 6px 0; outline: none; }
+  .custom-add-row button { background: var(--accent-dim); border: none; color: var(--accent); border-radius: 8px; padding: 6px 14px; font-size: 12px; cursor: pointer; }
 
   /* ========== F-202 微动作卡片 ========== */
   .micro-action-text { font-size: 19px; line-height: 1.6; min-height: 60px; display: flex; align-items: center; }
@@ -199,8 +218,17 @@
 
   <!-- F-202 / F-203 微动作 + 微启动 -->
   <div class="card">
-    <div class="card-title">今日微动作</div>
+    <div class="card-title">今日微动作
+      <button class="icon-btn" id="btnCustomToggle" title="管理自定义微动作">✏️</button>
+    </div>
     <div class="micro-action-text" id="microActionText"></div>
+    <div class="custom-panel" id="customPanel">
+      <div id="customList"></div>
+      <div class="custom-add-row">
+        <input id="customInput" maxlength="30" placeholder="加一个属于你自己的极小动作…">
+        <button id="btnCustomAdd">添加</button>
+      </div>
+    </div>
     <div class="micro-actions-row">
       <button class="btn btn-ghost" id="btnReroll">🎲 换一个</button>
       <button class="btn btn-primary" id="btnStart">▶ 1分钟微启动</button>
@@ -210,10 +238,13 @@
 
   <!-- F-301 断点存盘 -->
   <div class="card" id="checkpointCard">
-    <div class="card-title">上次的断点</div>
+    <div class="card-title">上次的断点
+      <button class="icon-btn" id="btnHistoryToggle" title="查看断点历史">📜</button>
+    </div>
     <div class="checkpoint-note" id="checkpointDisplay">点击这里，留下 1 句话断点…</div>
     <div class="checkpoint-time" id="checkpointTime"></div>
     <input class="checkpoint-input" id="checkpointInput" maxlength="50" placeholder="例：Redis Sentinel 配置文件改至第 32 行">
+    <div class="checkpoint-history" id="checkpointHistory"></div>
   </div>
 
   <!-- F-302 资产累计（只加不减，无 Streak） -->
@@ -261,6 +292,7 @@ const LS_KEY = 'low_power_app_state';
 const DEFAULT_STATE = {
   user_settings: { current_energy_level: 20, theme_mode: 'low-power' },
   current_checkpoint: { note: '', updated_at: null },
+  checkpoint_history: [], // 最近 10 条断点 {note, updated_at}，新的在前
   asset_stats: { total_completed_actions: 0, attempt_count: 0, total_rest_minutes: 0 },
   custom_micro_actions: []
 };
@@ -406,6 +438,8 @@ function completeTimer() {
   } else {
     state.asset_stats.total_rest_minutes += 20;
     saveState(); renderStats();
+    playChime(); // 温和磬音唤醒，避免睡过头也不惊扰
+    try { if (navigator.vibrate) navigator.vibrate([25, 120, 25]); } catch (e) {}
     showToast('高质量恢复完成，欢迎回来。');
   }
   timer = null;
@@ -501,7 +535,8 @@ function renderCheckpoint() {
   }
 }
 document.getElementById('checkpointCard').addEventListener('click', e => {
-  if (e.target === cpInput) return;
+  // 点击历史按钮/历史列表/输入框本身时不进入编辑态
+  if (e.target === cpInput || e.target.closest('#btnHistoryToggle') || e.target.closest('#checkpointHistory')) return;
   cpDisplay.style.display = 'none'; cpTime.style.display = 'none';
   cpInput.style.display = 'block';
   cpInput.value = state.current_checkpoint.note || '';
@@ -511,8 +546,13 @@ function commitCheckpoint() {
   const v = cpInput.value.trim().slice(0, 50); // 截断校验：上限 50 字
   // 误触保护：空输入不覆写旧断点，避免无损存盘被一次误点冲掉
   if (v !== '') {
-    state.current_checkpoint = { note: v, updated_at: new Date().toISOString() };
-    saveState();
+    const now = new Date().toISOString();
+    state.current_checkpoint = { note: v, updated_at: now };
+    // 断点历史：新的在前，最多保留 10 条
+    state.checkpoint_history = state.checkpoint_history || [];
+    state.checkpoint_history.unshift({ note: v, updated_at: now });
+    state.checkpoint_history = state.checkpoint_history.slice(0, 10);
+    saveState(); renderHistory();
     showToast('断点已保存');
   }
   cpInput.style.display = 'none';
@@ -521,6 +561,101 @@ function commitCheckpoint() {
 }
 cpInput.addEventListener('blur', commitCheckpoint);
 cpInput.addEventListener('keydown', e => { if (e.key === 'Enter') cpInput.blur(); });
+
+/* ================= 断点历史（📜 弱展示） ================= */
+function fmtTime(iso) {
+  const d = new Date(iso);
+  return (d.getMonth() + 1) + '-' + d.getDate() + ' ' + String(d.getHours()).padStart(2, '0') + ':' + String(d.getMinutes()).padStart(2, '0');
+}
+function renderHistory() {
+  const box = document.getElementById('checkpointHistory');
+  const list = state.checkpoint_history || [];
+  if (!list.length) {
+    box.innerHTML = '<div class="custom-empty">还没有历史断点，每一次存盘都会留在这里。</div>';
+    return;
+  }
+  box.innerHTML = list.map(h =>
+    '<div class="history-item"><span class="h-time">' + fmtTime(h.updated_at) + '</span>' +
+    h.note.replace(/</g, '&lt;') + '</div>'
+  ).join('');
+}
+document.getElementById('btnHistoryToggle').addEventListener('click', () => {
+  renderHistory();
+  document.getElementById('checkpointHistory').classList.toggle('open');
+});
+
+/* ================= 自定义微动作管理（✏️） ================= */
+function renderCustomList() {
+  const box = document.getElementById('customList');
+  const list = state.custom_micro_actions || [];
+  if (!list.length) {
+    box.innerHTML = '<div class="custom-empty">还没有自定义动作，加几个最贴合你生活的吧。</div>';
+    return;
+  }
+  box.innerHTML = list.map((a, i) =>
+    '<div class="custom-item"><span>' + a.replace(/</g, '&lt;') + '</span>' +
+    '<button data-i="' + i + '">移除</button></div>'
+  ).join('');
+  box.querySelectorAll('button').forEach(b => b.addEventListener('click', () => {
+    const removed = state.custom_micro_actions.splice(+b.dataset.i, 1)[0];
+    saveState(); renderCustomList();
+    if (currentAction === removed) drawAction(); // 删掉的正好是当前卡片则换一张
+  }));
+}
+document.getElementById('btnCustomToggle').addEventListener('click', () => {
+  renderCustomList();
+  document.getElementById('customPanel').classList.toggle('open');
+});
+document.getElementById('btnCustomAdd').addEventListener('click', () => {
+  const inp = document.getElementById('customInput');
+  const v = inp.value.trim().slice(0, 30);
+  if (!v) return;
+  state.custom_micro_actions = state.custom_micro_actions || [];
+  if (!state.custom_micro_actions.includes(v)) state.custom_micro_actions.push(v);
+  inp.value = '';
+  saveState(); renderCustomList();
+  showToast('已加入你的微动作库');
+});
+document.getElementById('customInput').addEventListener('keydown', e => {
+  if (e.key === 'Enter') document.getElementById('btnCustomAdd').click();
+});
+
+/* ================= 休息结束的温和磬音（528Hz 三声渐强，长衰减） ================= */
+function playChime() {
+  try {
+    audioCtx = audioCtx || new (window.AudioContext || window.webkitAudioContext)();
+    if (audioCtx.state === 'suspended') audioCtx.resume();
+    [0, 1.4, 2.8].forEach(function (delay, i) {
+      const t = audioCtx.currentTime + delay;
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = 'sine'; osc.frequency.value = 528;
+      gain.gain.setValueAtTime(0, t);
+      gain.gain.linearRampToValueAtTime(0.04 + i * 0.02, t + 0.06); // 逐声微强
+      gain.gain.exponentialRampToValueAtTime(0.0001, t + 2.2);       // 长衰减，不刺耳
+      osc.connect(gain).connect(audioCtx.destination);
+      osc.start(t); osc.stop(t + 2.3);
+    });
+  } catch (e) { /* 音频不可用时静默跳过 */ }
+}
+
+/* ================= 键盘快捷键（桌面端无障碍） ================= */
+document.addEventListener('keydown', e => {
+  const tag = (e.target && e.target.tagName) || '';
+  if (tag === 'INPUT' || tag === 'TEXTAREA') return; // 输入时不抢键盘
+  if (e.code === 'Space') {
+    e.preventDefault();
+    if (document.getElementById('completeModal').classList.contains('active')) {
+      document.getElementById('btnCloseRest').click();       // 弹窗开着：空格 = 关闭去休息
+    } else if (!timer) {
+      document.getElementById('btnStart').click();           // 主页：空格 = 1分钟微启动
+    } // 计时中空格不响应，防误触中断
+  } else if (e.key === 'r' || e.key === 'R') {
+    if (!timer) drawAction();                                // R = 抽卡换一个
+  } else if (e.key === 'Escape') {
+    if (timer) document.getElementById('btnCancelTimer').click(); // Esc = 温和退出计时
+  }
+});
 
 /* ================= 渲染与工具 ================= */
 function renderStats() {
